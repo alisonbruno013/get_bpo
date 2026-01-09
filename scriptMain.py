@@ -22,7 +22,8 @@ from utils import (
     get_latest_csv_file,
     filter_dataframe_by_operation,
     filter_dataframe_by_region,
-    upload_to_google_sheets
+    upload_to_google_sheets,
+    clean_downloads_folder
 )
 
 
@@ -185,6 +186,12 @@ def main():
                 sheet_url = upload_to_google_sheets(df)
                 print(f"\n✅ Upload concluído com sucesso!")
                 print(f"URL da planilha: {sheet_url}")
+                
+                # Limpa a pasta de downloads após upload bem-sucedido
+                print(f"\n{'='*50}")
+                print("Limpando pasta de downloads...")
+                clean_downloads_folder(download_dir)
+                print(f"{'='*50}")
             except FileNotFoundError as e:
                 print(f"❌ Erro: {e}")
             except ValueError as e:

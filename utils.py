@@ -124,6 +124,42 @@ def get_latest_csv_file(download_dir):
     return latest_file
 
 
+def clean_downloads_folder(download_dir):
+    """
+    Limpa todos os arquivos do diretório de downloads
+    
+    Args:
+        download_dir: Diretório de downloads
+    """
+    import glob
+    
+    try:
+        # Remove todos os arquivos CSV
+        csv_files = glob.glob(os.path.join(download_dir, "*.csv"))
+        for file in csv_files:
+            try:
+                os.remove(file)
+                print(f"  Removido: {os.path.basename(file)}")
+            except Exception as e:
+                print(f"  ⚠️ Erro ao remover {os.path.basename(file)}: {e}")
+        
+        # Remove arquivos .crdownload (se houver)
+        crdownload_files = glob.glob(os.path.join(download_dir, "*.crdownload"))
+        for file in crdownload_files:
+            try:
+                os.remove(file)
+            except Exception:
+                pass
+        
+        total_removed = len(csv_files) + len(crdownload_files)
+        if total_removed > 0:
+            print(f"✅ {total_removed} arquivo(s) removido(s) da pasta downloads")
+        else:
+            print("✅ Pasta downloads já estava vazia")
+    except Exception as e:
+        print(f"⚠️ Erro ao limpar pasta downloads: {e}")
+
+
 def filter_dataframe_by_operation(df, operation_column=None):
     """
     Filtra o DataFrame mantendo apenas valores específicos na coluna de operação
