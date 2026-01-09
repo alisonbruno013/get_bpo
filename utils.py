@@ -27,7 +27,7 @@ def wait_for_clickable(driver, xpath, timeout=30):
     btn.click()
 
 
-def wait_for_send_keys(driver, xpath, keys, timeout=10):
+def wait_for_send_keys(driver, xpath, keys, timeout=30):
     """
     Aguarda um elemento estar clicável e envia texto
     
