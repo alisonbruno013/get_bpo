@@ -16,12 +16,14 @@ from webdriver_manager.chrome import ChromeDriverManager
 from config import Config
 from utils import (
     wait_for_clickable,
+    wait_for_clickable_multiple,
     wait_for_send_keys,
     wait_for_download_complete,
     get_latest_csv_file,
     filter_dataframe_by_operation,
     filter_dataframe_by_region,
-    upload_to_google_sheets
+    upload_to_google_sheets,
+    clean_downloads_folder
 )
 
 
@@ -85,9 +87,46 @@ def main():
         wait_for_clickable(driver, "//*[@id='form']/div[2]/div/button")
         print("✅ Login realizado")
         
-        # Navega para a página de relatórios
-        wait_for_clickable(driver, "/html/body/div[1]/aside/nav/ul/li[1]/ul/li[2]/a")
-        print("✅ Navegação para relatórios")
+        # Aguarda a página carregar após o login
+        print("Aguardando página carregar após login...")
+        time.sleep(3)  # Espera inicial
+        
+        # Aguarda o menu aparecer (pode demorar mais no GitHub Actions)
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.webdriver.common.by import By
+        
+        try:
+            # Tenta encontrar qualquer elemento do menu para confirmar que a página carregou
+            WebDriverWait(driver, 30).until(
+                EC.presence_of_element_located((By.XPATH, "//aside//nav"))
+            )
+            print("✅ Menu carregado")
+        except Exception as e:
+            print(f"⚠️ Aviso: Menu pode não ter carregado completamente: {e}")
+        
+        # Aguarda mais um pouco para garantir
+        time.sleep(2)
+        
+        # Navega para a página de relatórios (com timeout maior e múltiplos XPaths)
+        print("Tentando navegar para relatórios...")
+        
+        # Tenta múltiplos XPaths possíveis
+        xpaths_relatorios = [
+            "/html/body/div[1]/aside/nav/ul/li[1]/ul/li[2]/a",
+            "//aside//nav//ul//li[1]//ul//li[2]//a",
+            "//a[contains(@href, 'daily') or contains(text(), 'Daily')]",
+            "//nav//a[contains(text(), 'Daily')]"
+        ]
+        
+        try:
+            wait_for_clickable_multiple(driver, xpaths_relatorios, timeout=30)
+            print("✅ Navegação para relatórios")
+        except Exception as e:
+            print(f"⚠️ Erro ao navegar: {e}")
+            print("Tentando continuar...")
+            # Tenta aguardar mais e continuar
+            time.sleep(5)
         
         # Configura as datas
         data_inicial = (datetime.datetime.now() - timedelta(days=Config.DAYS_BEFORE)).strftime("%d/%m/%Y")
@@ -147,6 +186,12 @@ def main():
                 sheet_url = upload_to_google_sheets(df)
                 print(f"\n✅ Upload concluído com sucesso!")
                 print(f"URL da planilha: {sheet_url}")
+                
+                # Limpa a pasta de downloads após upload bem-sucedido
+                print(f"\n{'='*50}")
+                print("Limpando pasta de downloads...")
+                clean_downloads_folder(download_dir)
+                print(f"{'='*50}")
             except FileNotFoundError as e:
                 print(f"❌ Erro: {e}")
             except ValueError as e:

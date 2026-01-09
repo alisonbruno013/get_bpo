@@ -22,9 +22,49 @@ def wait_for_clickable(driver, xpath, timeout=30):
         xpath: XPath do elemento
         timeout: Tempo máximo de espera em segundos
     """
+    import time
     wait = WebDriverWait(driver, timeout)
-    btn = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-    btn.click()
+    
+    try:
+        # Primeiro tenta encontrar o elemento
+        element = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
+        # Depois aguarda estar clicável
+        element = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
+        # Pequena espera antes de clicar
+        time.sleep(0.5)
+        element.click()
+    except Exception as e:
+        print(f"❌ Erro ao clicar no elemento {xpath}: {e}")
+        # Tenta scroll até o elemento
+        try:
+            element = driver.find_element(By.XPATH, xpath)
+            driver.execute_script("arguments[0].scrollIntoView(true);", element)
+            time.sleep(1)
+            element.click()
+        except Exception as e2:
+            raise Exception(f"Não foi possível clicar no elemento {xpath}. Erro original: {e}, Erro no scroll: {e2}")
+
+
+def wait_for_clickable_multiple(driver, xpaths, timeout=30):
+    """
+    Tenta clicar em um dos múltiplos XPaths fornecidos
+    
+    Args:
+        driver: Instância do WebDriver
+        xpaths: Lista de XPaths para tentar
+        timeout: Tempo máximo de espera em segundos para cada tentativa
+    """
+    for i, xpath in enumerate(xpaths):
+        try:
+            print(f"Tentativa {i+1}/{len(xpaths)}: {xpath[:50]}...")
+            wait_for_clickable(driver, xpath, timeout=timeout)
+            print(f"✅ Sucesso com XPath {i+1}")
+            return True
+        except Exception as e:
+            print(f"⚠️ XPath {i+1} falhou: {str(e)[:100]}")
+            if i == len(xpaths) - 1:
+                raise Exception(f"Todos os XPaths falharam. Último erro: {e}")
+    return False
 
 
 def wait_for_send_keys(driver, xpath, keys, timeout=30):
@@ -82,6 +122,42 @@ def get_latest_csv_file(download_dir):
     # Retorna o arquivo mais recente baseado na data de modificação
     latest_file = max(csv_files, key=os.path.getmtime)
     return latest_file
+
+
+def clean_downloads_folder(download_dir):
+    """
+    Limpa todos os arquivos do diretório de downloads
+    
+    Args:
+        download_dir: Diretório de downloads
+    """
+    import glob
+    
+    try:
+        # Remove todos os arquivos CSV
+        csv_files = glob.glob(os.path.join(download_dir, "*.csv"))
+        for file in csv_files:
+            try:
+                os.remove(file)
+                print(f"  Removido: {os.path.basename(file)}")
+            except Exception as e:
+                print(f"  ⚠️ Erro ao remover {os.path.basename(file)}: {e}")
+        
+        # Remove arquivos .crdownload (se houver)
+        crdownload_files = glob.glob(os.path.join(download_dir, "*.crdownload"))
+        for file in crdownload_files:
+            try:
+                os.remove(file)
+            except Exception:
+                pass
+        
+        total_removed = len(csv_files) + len(crdownload_files)
+        if total_removed > 0:
+            print(f"✅ {total_removed} arquivo(s) removido(s) da pasta downloads")
+        else:
+            print("✅ Pasta downloads já estava vazia")
+    except Exception as e:
+        print(f"⚠️ Erro ao limpar pasta downloads: {e}")
 
 
 def filter_dataframe_by_operation(df, operation_column=None):

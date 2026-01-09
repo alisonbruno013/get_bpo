@@ -14,7 +14,7 @@ jobs:
     
     steps:
     - name: Checkout código
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Configurar Python
       uses: actions/setup-python@v4
@@ -42,11 +42,15 @@ jobs:
       run: |
         echo "$GOOGLE_CREDENTIALS" > credentials.json
     
-    - name: Instalar Chrome e ChromeDriver
+    - name: Instalar Chrome
       run: |
         sudo apt-get update
+        sudo apt-get install -y wget gnupg
+        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+        sudo apt-get update
         sudo apt-get install -y google-chrome-stable
-        sudo apt-get install -y chromium-chromedriver
+        # ChromeDriver é gerenciado automaticamente pelo webdriver-manager
     
     - name: Executar script BPO
       run: |
@@ -54,9 +58,9 @@ jobs:
     
     - name: Upload de logs (se houver erro)
       if: failure()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: error-logs
-        path: |
+        paths: |
           downloads/
           *.log
