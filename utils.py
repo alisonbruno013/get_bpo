@@ -13,7 +13,7 @@ from google.oauth2.service_account import Credentials
 from config import Config
 
 
-def wait_for_clickable(driver, xpath, timeout=10):
+def wait_for_clickable(driver, xpath, timeout=30):
     """
     Aguarda um elemento estar clicável e clica nele
     
