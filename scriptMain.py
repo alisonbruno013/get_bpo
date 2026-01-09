@@ -38,15 +38,20 @@ def setup_chrome_driver():
     download_dir = os.path.join(os.getcwd(), Config.DOWNLOAD_DIR)
     os.makedirs(download_dir, exist_ok=True)
     
-    # Configura as opções do Chrome
+    # Configura as opções do Chrome para melhor compatibilidade headless
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless=new")  # Novo modo headless
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-browser-side-navigation")
     chrome_options.add_argument("--disable-web-security")
+    chrome_options.add_argument("--window-size=1920,1080")  # Tamanho de janela fixo
+    chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
     
     # Configura preferências de download
     prefs = {
@@ -89,43 +94,65 @@ def main():
         
         # Aguarda a página carregar após o login
         print("Aguardando página carregar após login...")
-        time.sleep(3)  # Espera inicial
+        time.sleep(5)  # Espera inicial maior
         
-        # Aguarda o menu aparecer (pode demorar mais no GitHub Actions)
+        # Aguarda a URL mudar ou algum elemento da página principal aparecer
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.common.by import By
         
         try:
-            # Tenta encontrar qualquer elemento do menu para confirmar que a página carregou
+            # Aguarda até que não esteja mais na página de login
+            WebDriverWait(driver, 30).until(
+                lambda d: "login" not in d.current_url.lower() or d.find_elements(By.XPATH, "//aside//nav")
+            )
+            print("✅ Página principal carregada")
+        except Exception as e:
+            print(f"⚠️ Aviso ao aguardar página principal: {e}")
+        
+        # Aguarda o menu aparecer
+        try:
             WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located((By.XPATH, "//aside//nav"))
             )
             print("✅ Menu carregado")
+            time.sleep(3)  # Espera adicional para menu renderizar
         except Exception as e:
             print(f"⚠️ Aviso: Menu pode não ter carregado completamente: {e}")
+            # Tenta aguardar mais
+            time.sleep(5)
         
-        # Aguarda mais um pouco para garantir
-        time.sleep(2)
-        
-        # Navega para a página de relatórios (com timeout maior e múltiplos XPaths)
+        # Tenta acessar diretamente a URL de relatórios se o menu não funcionar
         print("Tentando navegar para relatórios...")
         
-        # Tenta múltiplos XPaths possíveis
+        # Primeiro tenta pelo menu
         xpaths_relatorios = [
             "/html/body/div[1]/aside/nav/ul/li[1]/ul/li[2]/a",
             "//aside//nav//ul//li[1]//ul//li[2]//a",
             "//a[contains(@href, 'daily') or contains(text(), 'Daily')]",
-            "//nav//a[contains(text(), 'Daily')]"
+            "//nav//a[contains(text(), 'Daily')]",
+            "//a[contains(@href, 'daily-worker')]"
         ]
         
+        navegacao_sucesso = False
         try:
-            wait_for_clickable_multiple(driver, xpaths_relatorios, timeout=30)
-            print("✅ Navegação para relatórios")
+            wait_for_clickable_multiple(driver, xpaths_relatorios, timeout=20)
+            print("✅ Navegação para relatórios via menu")
+            navegacao_sucesso = True
         except Exception as e:
-            print(f"⚠️ Erro ao navegar: {e}")
-            print("Tentando continuar...")
-            # Tenta aguardar mais e continuar
+            print(f"⚠️ Erro ao navegar pelo menu: {e}")
+            # Tenta acessar diretamente a URL
+            try:
+                print("Tentando acessar URL diretamente...")
+                driver.get("https://dwmanagement.spx.com.br/daily-worker-requests")
+                time.sleep(5)
+                print("✅ Acesso direto à página de relatórios")
+                navegacao_sucesso = True
+            except Exception as e2:
+                print(f"⚠️ Erro ao acessar URL diretamente: {e2}")
+        
+        if not navegacao_sucesso:
+            print("⚠️ Continuando mesmo com erro de navegação...")
             time.sleep(5)
         
         # Configura as datas
