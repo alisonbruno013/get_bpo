@@ -67,7 +67,7 @@ def wait_for_clickable_multiple(driver, xpaths, timeout=30):
     return False
 
 
-def wait_for_send_keys(driver, xpath, keys, timeout=10):
+def wait_for_send_keys(driver, xpath, keys, timeout=30):
     """
     Aguarda um elemento estar clicável e envia texto
     
@@ -77,9 +77,31 @@ def wait_for_send_keys(driver, xpath, keys, timeout=10):
         keys: Texto a ser enviado
         timeout: Tempo máximo de espera em segundos
     """
+    import time
     wait = WebDriverWait(driver, timeout)
-    input_element = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-    input_element.send_keys(keys)
+    
+    try:
+        # Primeiro aguarda o elemento estar presente
+        element = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
+        # Depois aguarda estar visível e interagível
+        element = wait.until(EC.visibility_of_element_located((By.XPATH, xpath)))
+        # Pequena espera antes de interagir
+        time.sleep(0.5)
+        # Limpa o campo antes de enviar (se necessário)
+        element.clear()
+        # Envia as teclas
+        element.send_keys(keys)
+    except Exception as e:
+        print(f"❌ Erro ao enviar texto para {xpath}: {e}")
+        # Tenta scroll até o elemento
+        try:
+            element = driver.find_element(By.XPATH, xpath)
+            driver.execute_script("arguments[0].scrollIntoView(true);", element)
+            time.sleep(1)
+            element.clear()
+            element.send_keys(keys)
+        except Exception as e2:
+            raise Exception(f"Não foi possível enviar texto para {xpath}. Erro original: {e}, Erro no scroll: {e2}")
 
 
 def wait_for_download_complete(download_dir, timeout=60):
