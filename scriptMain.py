@@ -125,18 +125,20 @@ def main():
         # Tenta acessar diretamente a URL de relatórios se o menu não funcionar
         print("Tentando navegar para relatórios...")
         
-        # Primeiro tenta pelo menu
-        xpaths_relatorios = [
-            "/html/body/div[1]/aside/nav/ul/li[1]/ul/li[2]/a",
-            "//aside//nav//ul//li[1]//ul//li[2]//a",
-            "//a[contains(@href, 'daily') or contains(text(), 'Daily')]",
-            "//nav//a[contains(text(), 'Daily')]",
-            "//a[contains(@href, 'daily-worker')]"
+        # Primeiro tenta pelo menu (com múltiplos tipos de seletores)
+        selectors_relatorios = [
+            ("/html/body/div[1]/aside/nav/ul/li[1]/ul/li[2]/a", "xpath"),
+            ("//aside//nav//ul//li[1]//ul//li[2]//a", "xpath"),
+            ("//a[contains(@href, 'daily') or contains(text(), 'Daily')]", "xpath"),
+            ("//nav//a[contains(text(), 'Daily')]", "xpath"),
+            ("//a[contains(@href, 'daily-worker')]", "xpath"),
+            ("a[href*='daily-worker']", "css"),
+            ("nav a:contains('Daily')", "css")
         ]
         
         navegacao_sucesso = False
         try:
-            wait_for_clickable_multiple(driver, xpaths_relatorios, timeout=20)
+            wait_for_clickable_multiple(driver, selectors_relatorios, timeout=20)
             print("✅ Navegação para relatórios via menu")
             navegacao_sucesso = True
         except Exception as e:
@@ -145,8 +147,32 @@ def main():
             try:
                 print("Tentando acessar URL diretamente...")
                 driver.get("https://dwmanagement.spx.com.br/daily-worker-requests")
-                time.sleep(5)
-                print("✅ Acesso direto à página de relatórios")
+                
+                # Aguarda a página carregar completamente
+                from selenium.webdriver.support.ui import WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                from selenium.webdriver.common.by import By
+                
+                print("Aguardando página de relatórios carregar...")
+                # Aguarda até que algum elemento da página apareça
+                WebDriverWait(driver, 30).until(
+                    lambda d: d.execute_script("return document.readyState") == "complete"
+                )
+                time.sleep(3)  # Espera adicional para JavaScript carregar
+                
+                # Tenta encontrar qualquer campo de formulário para confirmar que carregou
+                try:
+                    WebDriverWait(driver, 20).until(
+                        EC.any_of(
+                            EC.presence_of_element_located((By.ID, "data.fromDate")),
+                            EC.presence_of_element_located((By.CSS_SELECTOR, "#data\\.fromDate")),
+                            EC.presence_of_element_located((By.NAME, "data.fromDate"))
+                        )
+                    )
+                    print("✅ Página de relatórios carregada")
+                except:
+                    print("⚠️ Campos podem não ter carregado completamente")
+                
                 navegacao_sucesso = True
             except Exception as e2:
                 print(f"⚠️ Erro ao acessar URL diretamente: {e2}")
@@ -162,9 +188,52 @@ def main():
         print(f"Data Inicial: {data_inicial}")
         print(f"Data Final: {data_final}")
         
-        # Preenche as datas
-        wait_for_send_keys(driver, "//*[@id='data.fromDate']", data_inicial)
-        wait_for_send_keys(driver, "//*[@id='data.toDate']", data_final)
+        # Preenche as datas - tenta múltiplos seletores
+        print("Preenchendo campo de data inicial...")
+        selectors_from_date = [
+            ("#data\\.fromDate", "css"),
+            ("data.fromDate", "id"),
+            ("//*[@id='data.fromDate']", "xpath"),
+            ("input[name='data.fromDate']", "css"),
+            ("input[id='data.fromDate']", "css")
+        ]
+        
+        data_preenchida = False
+        for selector, by_type in selectors_from_date:
+            try:
+                wait_for_send_keys(driver, selector, data_inicial, timeout=15, by_type=by_type)
+                print(f"✅ Data inicial preenchida usando {by_type}: {selector}")
+                data_preenchida = True
+                break
+            except Exception as e:
+                print(f"⚠️ Falhou com {by_type} {selector}: {str(e)[:80]}")
+                continue
+        
+        if not data_preenchida:
+            raise Exception("Não foi possível preencher campo de data inicial")
+        
+        print("Preenchendo campo de data final...")
+        selectors_to_date = [
+            ("#data\\.toDate", "css"),
+            ("data.toDate", "id"),
+            ("//*[@id='data.toDate']", "xpath"),
+            ("input[name='data.toDate']", "css"),
+            ("input[id='data.toDate']", "css")
+        ]
+        
+        data_preenchida = False
+        for selector, by_type in selectors_to_date:
+            try:
+                wait_for_send_keys(driver, selector, data_final, timeout=15, by_type=by_type)
+                print(f"✅ Data final preenchida usando {by_type}: {selector}")
+                data_preenchida = True
+                break
+            except Exception as e:
+                print(f"⚠️ Falhou com {by_type} {selector}: {str(e)[:80]}")
+                continue
+        
+        if not data_preenchida:
+            raise Exception("Não foi possível preencher campo de data final")
         
         # Gera o relatório
         wait_for_clickable(driver, "/html/body/div[1]/div[1]/main/div/section/header/div[2]/div/button")

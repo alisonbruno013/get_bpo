@@ -13,78 +13,109 @@ from google.oauth2.service_account import Credentials
 from config import Config
 
 
-def wait_for_clickable(driver, xpath, timeout=30):
+def wait_for_clickable(driver, selector, timeout=30, by_type='xpath'):
     """
     Aguarda um elemento estar clicável e clica nele
     
     Args:
         driver: Instância do WebDriver
-        xpath: XPath do elemento
+        selector: Seletor do elemento (XPath ou CSS)
         timeout: Tempo máximo de espera em segundos
+        by_type: Tipo de seletor ('xpath', 'css', 'id', 'name', 'class_name')
     """
     import time
     wait = WebDriverWait(driver, timeout)
     
+    # Mapeia o tipo de seletor
+    by_map = {
+        'xpath': By.XPATH,
+        'css': By.CSS_SELECTOR,
+        'id': By.ID,
+        'name': By.NAME,
+        'class_name': By.CLASS_NAME
+    }
+    
+    by = by_map.get(by_type.lower(), By.XPATH)
+    
     try:
         # Primeiro tenta encontrar o elemento
-        element = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
+        element = wait.until(EC.presence_of_element_located((by, selector)))
         # Depois aguarda estar clicável
-        element = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
+        element = wait.until(EC.element_to_be_clickable((by, selector)))
         # Pequena espera antes de clicar
         time.sleep(0.5)
         element.click()
     except Exception as e:
-        print(f"❌ Erro ao clicar no elemento {xpath}: {e}")
+        print(f"❌ Erro ao clicar no elemento {selector} ({by_type}): {e}")
         # Tenta scroll até o elemento
         try:
-            element = driver.find_element(By.XPATH, xpath)
+            element = driver.find_element(by, selector)
             driver.execute_script("arguments[0].scrollIntoView(true);", element)
             time.sleep(1)
             element.click()
         except Exception as e2:
-            raise Exception(f"Não foi possível clicar no elemento {xpath}. Erro original: {e}, Erro no scroll: {e2}")
+            raise Exception(f"Não foi possível clicar no elemento {selector} ({by_type}). Erro original: {e}, Erro no scroll: {e2}")
 
 
-def wait_for_clickable_multiple(driver, xpaths, timeout=30):
+def wait_for_clickable_multiple(driver, selectors, timeout=30):
     """
-    Tenta clicar em um dos múltiplos XPaths fornecidos
+    Tenta clicar em um dos múltiplos seletores fornecidos
     
     Args:
         driver: Instância do WebDriver
-        xpaths: Lista de XPaths para tentar
+        selectors: Lista de seletores (strings ou tuplas (selector, by_type))
         timeout: Tempo máximo de espera em segundos para cada tentativa
     """
-    for i, xpath in enumerate(xpaths):
+    for i, selector_info in enumerate(selectors):
+        # Se for tupla, extrai selector e tipo
+        if isinstance(selector_info, tuple):
+            selector, by_type = selector_info
+        else:
+            selector = selector_info
+            by_type = 'xpath'  # Padrão
+        
         try:
-            print(f"Tentativa {i+1}/{len(xpaths)}: {xpath[:50]}...")
-            wait_for_clickable(driver, xpath, timeout=timeout)
-            print(f"✅ Sucesso com XPath {i+1}")
+            print(f"Tentativa {i+1}/{len(selectors)}: {selector[:50]}... ({by_type})")
+            wait_for_clickable(driver, selector, timeout=timeout, by_type=by_type)
+            print(f"✅ Sucesso com seletor {i+1}")
             return True
         except Exception as e:
-            print(f"⚠️ XPath {i+1} falhou: {str(e)[:100]}")
-            if i == len(xpaths) - 1:
-                raise Exception(f"Todos os XPaths falharam. Último erro: {e}")
+            print(f"⚠️ Seletor {i+1} falhou: {str(e)[:100]}")
+            if i == len(selectors) - 1:
+                raise Exception(f"Todos os seletores falharam. Último erro: {e}")
     return False
 
 
-def wait_for_send_keys(driver, xpath, keys, timeout=30):
+def wait_for_send_keys(driver, selector, keys, timeout=30, by_type='xpath'):
     """
     Aguarda um elemento estar clicável e envia texto
     
     Args:
         driver: Instância do WebDriver
-        xpath: XPath do elemento
+        selector: Seletor do elemento (XPath ou CSS)
         keys: Texto a ser enviado
         timeout: Tempo máximo de espera em segundos
+        by_type: Tipo de seletor ('xpath', 'css', 'id', 'name', 'class_name')
     """
     import time
     wait = WebDriverWait(driver, timeout)
     
+    # Mapeia o tipo de seletor
+    by_map = {
+        'xpath': By.XPATH,
+        'css': By.CSS_SELECTOR,
+        'id': By.ID,
+        'name': By.NAME,
+        'class_name': By.CLASS_NAME
+    }
+    
+    by = by_map.get(by_type.lower(), By.XPATH)
+    
     try:
         # Primeiro aguarda o elemento estar presente
-        element = wait.until(EC.presence_of_element_located((By.XPATH, xpath)))
+        element = wait.until(EC.presence_of_element_located((by, selector)))
         # Depois aguarda estar visível e interagível
-        element = wait.until(EC.visibility_of_element_located((By.XPATH, xpath)))
+        element = wait.until(EC.visibility_of_element_located((by, selector)))
         # Pequena espera antes de interagir
         time.sleep(0.5)
         # Limpa o campo antes de enviar (se necessário)
@@ -92,16 +123,16 @@ def wait_for_send_keys(driver, xpath, keys, timeout=30):
         # Envia as teclas
         element.send_keys(keys)
     except Exception as e:
-        print(f"❌ Erro ao enviar texto para {xpath}: {e}")
+        print(f"❌ Erro ao enviar texto para {selector} ({by_type}): {e}")
         # Tenta scroll até o elemento
         try:
-            element = driver.find_element(By.XPATH, xpath)
+            element = driver.find_element(by, selector)
             driver.execute_script("arguments[0].scrollIntoView(true);", element)
             time.sleep(1)
             element.clear()
             element.send_keys(keys)
         except Exception as e2:
-            raise Exception(f"Não foi possível enviar texto para {xpath}. Erro original: {e}, Erro no scroll: {e2}")
+            raise Exception(f"Não foi possível enviar texto para {selector} ({by_type}). Erro original: {e}, Erro no scroll: {e2}")
 
 
 def wait_for_download_complete(download_dir, timeout=60):
