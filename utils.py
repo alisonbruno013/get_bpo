@@ -11,6 +11,11 @@ from selenium.webdriver.support import expected_conditions as EC
 import gspread
 from google.oauth2.service_account import Credentials
 from config import Config
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from datetime import datetime
 
 
 def wait_for_clickable_js(driver, selector, timeout=30, by_type='id'):
@@ -337,6 +342,90 @@ def get_latest_csv_file(download_dir):
     # Retorna o arquivo mais recente baseado na data de modificação
     latest_file = max(csv_files, key=os.path.getmtime)
     return latest_file
+
+
+def send_error_email(driver, error_message, screenshot_path=None):
+    """
+    Envia email com screenshot quando ocorre erro crítico
+    
+    Args:
+        driver: Instância do WebDriver
+        error_message: Mensagem de erro
+        screenshot_path: Caminho do screenshot (se None, tira um novo)
+    """
+    # Carrega configurações de email
+    Config.load_email_config()
+    
+    if not Config.EMAIL_ALERT_ENABLED:
+        print("⚠️ Alertas de email desabilitados")
+        return
+    
+    try:
+        # Tira screenshot se não foi fornecido
+        if screenshot_path is None and driver:
+            screenshot_path = f"screenshot_error_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            try:
+                # Tenta tirar screenshot (funciona mesmo em headless)
+                driver.save_screenshot(screenshot_path)
+                print(f"📸 Screenshot salvo: {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"⚠️ Erro ao tirar screenshot: {screenshot_error}")
+                screenshot_path = None
+        
+        # Verifica se há configuração de email
+        email_to = Config.EMAIL_TO
+        email_from = Config.EMAIL_FROM
+        email_password = Config.EMAIL_PASSWORD
+        
+        if not email_to or not email_from or not email_password:
+            print("⚠️ Email não configurado. Execute 'python save_email_config.py' ou configure secrets no GitHub")
+            if screenshot_path and os.path.exists(screenshot_path):
+                print(f"📸 Screenshot salvo em: {screenshot_path}")
+            return
+        
+        # Cria a mensagem
+        msg = MIMEMultipart()
+        msg['From'] = email_from
+        msg['To'] = email_to
+        msg['Subject'] = f"🚨 Erro no Script BPO - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+        
+        # Corpo do email
+        body = f"""
+        <html>
+        <body>
+            <h2>Erro Detectado no Script BPO</h2>
+            <p><strong>Data/Hora:</strong> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
+            <p><strong>Erro:</strong></p>
+            <pre>{error_message}</pre>
+            <p>Screenshot anexado abaixo.</p>
+        </body>
+        </html>
+        """
+        msg.attach(MIMEText(body, 'html'))
+        
+        # Anexa o screenshot
+        if screenshot_path and os.path.exists(screenshot_path):
+            with open(screenshot_path, 'rb') as f:
+                img = MIMEImage(f.read())
+                img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(screenshot_path))
+                msg.attach(img)
+        
+        # Envia o email
+        server = smtplib.SMTP(Config.EMAIL_SMTP_SERVER, Config.EMAIL_SMTP_PORT)
+        server.starttls()
+        server.login(email_from, email_password)
+        text = msg.as_string()
+        server.sendmail(email_from, email_to, text)
+        server.quit()
+        
+        print(f"✅ Email de erro enviado para {email_to}")
+        
+        # Remove o screenshot após enviar (opcional)
+        # if screenshot_path and os.path.exists(screenshot_path):
+        #     os.remove(screenshot_path)
+        
+    except Exception as e:
+        print(f"❌ Erro ao enviar email: {e}")
 
 
 def clean_downloads_folder(download_dir):

@@ -35,6 +35,36 @@ class Config:
     DAYS_BEFORE = 5
     DAYS_AFTER = 5
     
+    # Configurações de Email para alertas
+    EMAIL_ALERT_ENABLED = True  # Ativar/desativar envio de emails
+    EMAIL_SMTP_SERVER = "smtp.gmail.com"  # Servidor SMTP
+    EMAIL_SMTP_PORT = 587  # Porta SMTP
+    EMAIL_CONFIG_FILE = "email_config.pkl"
+    EMAIL_FROM = None  # Será configurado via secrets ou arquivo
+    EMAIL_TO = None  # Email de destino (será configurado)
+    EMAIL_PASSWORD = None  # Senha do email (será configurado via secrets)
+    
+    @staticmethod
+    def load_email_config():
+        """Carrega configurações de email do arquivo ou variáveis de ambiente"""
+        # Tenta carregar do arquivo
+        if os.path.exists(Config.EMAIL_CONFIG_FILE):
+            try:
+                with open(Config.EMAIL_CONFIG_FILE, "rb") as f:
+                    email_config = pickle.load(f)
+                    Config.EMAIL_FROM = email_config.get("email_from")
+                    Config.EMAIL_TO = email_config.get("email_to")
+                    Config.EMAIL_PASSWORD = email_config.get("email_password")
+                    return
+            except:
+                pass
+        
+        # Tenta carregar de variáveis de ambiente (para GitHub Actions)
+        import os as os_env
+        Config.EMAIL_FROM = os_env.getenv("EMAIL_FROM")
+        Config.EMAIL_TO = os_env.getenv("EMAIL_TO")
+        Config.EMAIL_PASSWORD = os_env.getenv("EMAIL_PASSWORD")
+    
     @staticmethod
     def save_credentials(email: str, password: str):
         """

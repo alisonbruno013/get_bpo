@@ -25,7 +25,8 @@ from utils import (
     filter_dataframe_by_operation,
     filter_dataframe_by_region,
     upload_to_google_sheets,
-    clean_downloads_folder
+    clean_downloads_folder,
+    send_error_email
 )
 
 
@@ -76,6 +77,9 @@ def setup_chrome_driver():
 def main():
     """Função principal do script"""
     try:
+        # Carrega configurações de email
+        Config.load_email_config()
+        
         # Carrega credenciais
         email, password = Config.get_credentials()
         print(f"✅ Credenciais carregadas para: {email}")
@@ -119,7 +123,13 @@ def main():
             )
             print("✅ Página principal carregada")
         except Exception as e:
-            print(f"⚠️ Aviso ao aguardar página principal: {e}")
+            error_msg = f"⚠️ Aviso ao aguardar página principal: {e}"
+            print(error_msg)
+            # Envia screenshot por email
+            try:
+                send_error_email(driver, str(e))
+            except Exception as email_error:
+                print(f"⚠️ Erro ao enviar email: {email_error}")
         
         # Aguarda o menu aparecer
         try:
@@ -129,7 +139,13 @@ def main():
             print("✅ Menu carregado")
             time.sleep(3)  # Espera adicional para menu renderizar
         except Exception as e:
-            print(f"⚠️ Aviso: Menu pode não ter carregado completamente: {e}")
+            error_msg = f"⚠️ Aviso: Menu pode não ter carregado completamente: {e}"
+            print(error_msg)
+            # Envia screenshot por email
+            try:
+                send_error_email(driver, str(e))
+            except Exception as email_error:
+                print(f"⚠️ Erro ao enviar email: {email_error}")
             # Tenta aguardar mais
             time.sleep(5)
         
