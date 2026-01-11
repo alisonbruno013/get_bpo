@@ -1,6 +1,7 @@
 # Credenciais
 credentials.pkl
 credentials.json
+email_config.pkl
 
 # Downloads
 downloads/

@@ -11,6 +11,173 @@ from selenium.webdriver.support import expected_conditions as EC
 import gspread
 from google.oauth2.service_account import Credentials
 from config import Config
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from datetime import datetime
+
+
+def wait_for_clickable_js(driver, selector, timeout=30, by_type='id'):
+    """
+    Aguarda um elemento estar clicável e clica nele usando JavaScript
+    
+    Args:
+        driver: Instância do WebDriver
+        selector: Seletor do elemento (ID, CSS, XPath)
+        timeout: Tempo máximo de espera em segundos
+        by_type: Tipo de seletor ('id', 'css', 'xpath', 'name')
+    """
+    import time
+    wait = WebDriverWait(driver, timeout)
+    
+    try:
+        # Aguarda o elemento existir no DOM
+        if by_type == 'id':
+            js_find = f"document.getElementById('{selector}')"
+        elif by_type == 'css':
+            js_find = f"document.querySelector('{selector}')"
+        elif by_type == 'name':
+            js_find = f"document.querySelector('[name=\"{selector}\"]')"
+        elif by_type == 'xpath':
+            # XPath via JavaScript é mais complexo, usa evaluate
+            js_find = f"""
+            function getElementByXpath(path) {{
+                return document.evaluate(path, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            }}
+            getElementByXpath('{selector}');
+            """
+        else:
+            js_find = f"document.getElementById('{selector}')"
+        
+        # Aguarda o elemento aparecer
+        element_found = wait.until(
+            lambda d: d.execute_script(f"return {js_find if by_type != 'xpath' else js_find.strip()};") is not None
+        )
+        
+        time.sleep(0.5)
+        
+        # Clica usando JavaScript
+        if by_type == 'xpath':
+            click_js = f"""
+            var element = document.evaluate('{selector}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            if (element) {{
+                element.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+                element.click();
+                return true;
+            }}
+            return false;
+            """
+        else:
+            if by_type == 'id':
+                click_js = f"document.getElementById('{selector}').click();"
+            elif by_type == 'css':
+                click_js = f"document.querySelector('{selector}').click();"
+            elif by_type == 'name':
+                click_js = f"document.querySelector('[name=\"{selector}\"]').click();"
+        
+        driver.execute_script(click_js)
+        print(f"✅ Clicado via JavaScript: {selector} ({by_type})")
+        
+    except Exception as e:
+        print(f"❌ Erro ao clicar via JavaScript {selector} ({by_type}): {e}")
+        raise
+
+
+def wait_for_send_keys_js(driver, selector, keys, timeout=30, by_type='id'):
+    """
+    Aguarda um elemento estar presente e envia texto usando JavaScript
+    
+    Args:
+        driver: Instância do WebDriver
+        selector: Seletor do elemento (ID, CSS, XPath)
+        keys: Texto a ser enviado
+        timeout: Tempo máximo de espera em segundos
+        by_type: Tipo de seletor ('id', 'css', 'xpath', 'name')
+    """
+    import time
+    wait = WebDriverWait(driver, timeout)
+    
+    try:
+        # Aguarda o elemento existir no DOM
+        if by_type == 'id':
+            js_find = f"document.getElementById('{selector}')"
+        elif by_type == 'css':
+            js_find = f"document.querySelector('{selector}')"
+        elif by_type == 'name':
+            js_find = f"document.querySelector('[name=\"{selector}\"]')"
+        elif by_type == 'xpath':
+            js_find = f"""
+            function getElementByXpath(path) {{
+                return document.evaluate(path, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            }}
+            getElementByXpath('{selector}');
+            """
+        else:
+            js_find = f"document.getElementById('{selector}')"
+        
+        # Aguarda o elemento aparecer
+        element_found = wait.until(
+            lambda d: d.execute_script(f"return {js_find if by_type != 'xpath' else js_find.strip()};") is not None
+        )
+        
+        time.sleep(0.5)
+        
+        # Envia texto usando JavaScript
+        if by_type == 'xpath':
+            send_keys_js = f"""
+            var element = document.evaluate('{selector}', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+            if (element) {{
+                element.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+                element.focus();
+                element.value = '{keys}';
+                element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                element.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                return true;
+            }}
+            return false;
+            """
+        else:
+            if by_type == 'id':
+                send_keys_js = f"""
+                var element = document.getElementById('{selector}');
+                if (element) {{
+                    element.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+                    element.focus();
+                    element.value = '{keys}';
+                    element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    element.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+                """
+            elif by_type == 'css':
+                send_keys_js = f"""
+                var element = document.querySelector('{selector}');
+                if (element) {{
+                    element.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+                    element.focus();
+                    element.value = '{keys}';
+                    element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    element.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+                """
+            elif by_type == 'name':
+                send_keys_js = f"""
+                var element = document.querySelector('[name="{selector}"]');
+                if (element) {{
+                    element.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+                    element.focus();
+                    element.value = '{keys}';
+                    element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    element.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
+                """
+        
+        driver.execute_script(send_keys_js)
+        print(f"✅ Texto enviado via JavaScript: {selector} ({by_type})")
+        
+    except Exception as e:
+        print(f"❌ Erro ao enviar texto via JavaScript {selector} ({by_type}): {e}")
+        raise
 
 
 def wait_for_clickable(driver, selector, timeout=30, by_type='xpath'):
@@ -175,6 +342,90 @@ def get_latest_csv_file(download_dir):
     # Retorna o arquivo mais recente baseado na data de modificação
     latest_file = max(csv_files, key=os.path.getmtime)
     return latest_file
+
+
+def send_error_email(driver, error_message, screenshot_path=None):
+    """
+    Envia email com screenshot quando ocorre erro crítico
+    
+    Args:
+        driver: Instância do WebDriver
+        error_message: Mensagem de erro
+        screenshot_path: Caminho do screenshot (se None, tira um novo)
+    """
+    # Carrega configurações de email
+    Config.load_email_config()
+    
+    if not Config.EMAIL_ALERT_ENABLED:
+        print("⚠️ Alertas de email desabilitados")
+        return
+    
+    try:
+        # Tira screenshot se não foi fornecido
+        if screenshot_path is None and driver:
+            screenshot_path = f"screenshot_error_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+            try:
+                # Tenta tirar screenshot (funciona mesmo em headless)
+                driver.save_screenshot(screenshot_path)
+                print(f"📸 Screenshot salvo: {screenshot_path}")
+            except Exception as screenshot_error:
+                print(f"⚠️ Erro ao tirar screenshot: {screenshot_error}")
+                screenshot_path = None
+        
+        # Verifica se há configuração de email
+        email_to = Config.EMAIL_TO
+        email_from = Config.EMAIL_FROM
+        email_password = Config.EMAIL_PASSWORD
+        
+        if not email_to or not email_from or not email_password:
+            print("⚠️ Email não configurado. Execute 'python save_email_config.py' ou configure secrets no GitHub")
+            if screenshot_path and os.path.exists(screenshot_path):
+                print(f"📸 Screenshot salvo em: {screenshot_path}")
+            return
+        
+        # Cria a mensagem
+        msg = MIMEMultipart()
+        msg['From'] = email_from
+        msg['To'] = email_to
+        msg['Subject'] = f"🚨 Erro no Script BPO - {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+        
+        # Corpo do email
+        body = f"""
+        <html>
+        <body>
+            <h2>Erro Detectado no Script BPO</h2>
+            <p><strong>Data/Hora:</strong> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
+            <p><strong>Erro:</strong></p>
+            <pre>{error_message}</pre>
+            <p>Screenshot anexado abaixo.</p>
+        </body>
+        </html>
+        """
+        msg.attach(MIMEText(body, 'html'))
+        
+        # Anexa o screenshot
+        if screenshot_path and os.path.exists(screenshot_path):
+            with open(screenshot_path, 'rb') as f:
+                img = MIMEImage(f.read())
+                img.add_header('Content-Disposition', 'attachment', filename=os.path.basename(screenshot_path))
+                msg.attach(img)
+        
+        # Envia o email
+        server = smtplib.SMTP(Config.EMAIL_SMTP_SERVER, Config.EMAIL_SMTP_PORT)
+        server.starttls()
+        server.login(email_from, email_password)
+        text = msg.as_string()
+        server.sendmail(email_from, email_to, text)
+        server.quit()
+        
+        print(f"✅ Email de erro enviado para {email_to}")
+        
+        # Remove o screenshot após enviar (opcional)
+        # if screenshot_path and os.path.exists(screenshot_path):
+        #     os.remove(screenshot_path)
+        
+    except Exception as e:
+        print(f"❌ Erro ao enviar email: {e}")
 
 
 def clean_downloads_folder(download_dir):

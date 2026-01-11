@@ -42,6 +42,15 @@ jobs:
       run: |
         echo "$GOOGLE_CREDENTIALS" > credentials.json
     
+    - name: Configurar email para alertas
+      env:
+        EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+        EMAIL_TO: ${{ secrets.EMAIL_TO }}
+        EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      run: |
+        # As variáveis de ambiente serão usadas automaticamente pelo script
+        echo "Configurações de email configuradas via secrets"
+    
     - name: Instalar Chrome
       run: |
         sudo apt-get update

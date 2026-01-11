@@ -16,14 +16,17 @@ from webdriver_manager.chrome import ChromeDriverManager
 from config import Config
 from utils import (
     wait_for_clickable,
+    wait_for_clickable_js,
     wait_for_clickable_multiple,
     wait_for_send_keys,
+    wait_for_send_keys_js,
     wait_for_download_complete,
     get_latest_csv_file,
     filter_dataframe_by_operation,
     filter_dataframe_by_region,
     upload_to_google_sheets,
-    clean_downloads_folder
+    clean_downloads_folder,
+    send_error_email
 )
 
 
@@ -74,6 +77,9 @@ def setup_chrome_driver():
 def main():
     """Função principal do script"""
     try:
+        # Carrega configurações de email
+        Config.load_email_config()
+        
         # Carrega credenciais
         email, password = Config.get_credentials()
         print(f"✅ Credenciais carregadas para: {email}")
@@ -86,11 +92,20 @@ def main():
         driver.get("https://dwmanagement.spx.com.br/")
         print("✅ Site acessado")
         
-        # Faz login
-        wait_for_send_keys(driver, "//*[@id='data.email']", email)
-        wait_for_send_keys(driver, "//*[@id='data.password']", password)
-        wait_for_clickable(driver, "//*[@id='form']/div[2]/div/button")
-        print("✅ Login realizado")
+        # Faz login usando JavaScript (mais confiável)
+        print("Fazendo login via JavaScript...")
+        try:
+            wait_for_send_keys_js(driver, "data.email", email, timeout=20, by_type='id')
+            wait_for_send_keys_js(driver, "data.password", password, timeout=20, by_type='id')
+            wait_for_clickable_js(driver, "//*[@id='form']/div[2]/div/button", timeout=20, by_type='xpath')
+            print("✅ Login realizado via JavaScript")
+        except Exception as e:
+            print(f"⚠️ Login via JS falhou, tentando método tradicional: {e}")
+            # Fallback para método tradicional
+            wait_for_send_keys(driver, "//*[@id='data.email']", email, timeout=20)
+            wait_for_send_keys(driver, "//*[@id='data.password']", password, timeout=20)
+            wait_for_clickable(driver, "//*[@id='form']/div[2]/div/button", timeout=20)
+            print("✅ Login realizado via método tradicional")
         
         # Aguarda a página carregar após o login
         print("Aguardando página carregar após login...")
@@ -108,7 +123,13 @@ def main():
             )
             print("✅ Página principal carregada")
         except Exception as e:
-            print(f"⚠️ Aviso ao aguardar página principal: {e}")
+            error_msg = f"⚠️ Aviso ao aguardar página principal: {e}"
+            print(error_msg)
+            # Envia screenshot por email
+            try:
+                send_error_email(driver, str(e))
+            except Exception as email_error:
+                print(f"⚠️ Erro ao enviar email: {email_error}")
         
         # Aguarda o menu aparecer
         try:
@@ -118,7 +139,13 @@ def main():
             print("✅ Menu carregado")
             time.sleep(3)  # Espera adicional para menu renderizar
         except Exception as e:
-            print(f"⚠️ Aviso: Menu pode não ter carregado completamente: {e}")
+            error_msg = f"⚠️ Aviso: Menu pode não ter carregado completamente: {e}"
+            print(error_msg)
+            # Envia screenshot por email
+            try:
+                send_error_email(driver, str(e))
+            except Exception as email_error:
+                print(f"⚠️ Erro ao enviar email: {email_error}")
             # Tenta aguardar mais
             time.sleep(5)
         
@@ -188,49 +215,63 @@ def main():
         print(f"Data Inicial: {data_inicial}")
         print(f"Data Final: {data_final}")
         
-        # Preenche as datas - tenta múltiplos seletores
-        print("Preenchendo campo de data inicial...")
+        # Preenche as datas usando JavaScript (mais confiável)
+        print("Preenchendo campo de data inicial via JavaScript...")
         selectors_from_date = [
-            ("#data\\.fromDate", "css"),
             ("data.fromDate", "id"),
+            ("#data\\.fromDate", "css"),
             ("//*[@id='data.fromDate']", "xpath"),
-            ("input[name='data.fromDate']", "css"),
-            ("input[id='data.fromDate']", "css")
+            ("data.fromDate", "name")
         ]
         
         data_preenchida = False
         for selector, by_type in selectors_from_date:
             try:
-                wait_for_send_keys(driver, selector, data_inicial, timeout=15, by_type=by_type)
-                print(f"✅ Data inicial preenchida usando {by_type}: {selector}")
+                wait_for_send_keys_js(driver, selector, data_inicial, timeout=15, by_type=by_type)
+                print(f"✅ Data inicial preenchida via JS usando {by_type}: {selector}")
                 data_preenchida = True
                 break
             except Exception as e:
-                print(f"⚠️ Falhou com {by_type} {selector}: {str(e)[:80]}")
-                continue
+                print(f"⚠️ Falhou JS com {by_type} {selector}: {str(e)[:80]}")
+                # Tenta método tradicional como fallback
+                try:
+                    wait_for_send_keys(driver, selector, data_inicial, timeout=10, by_type=by_type)
+                    print(f"✅ Data inicial preenchida via método tradicional: {selector}")
+                    data_preenchida = True
+                    break
+                except:
+                    continue
         
         if not data_preenchida:
             raise Exception("Não foi possível preencher campo de data inicial")
         
-        print("Preenchendo campo de data final...")
+        time.sleep(1)  # Pequena pausa entre campos
+        
+        print("Preenchendo campo de data final via JavaScript...")
         selectors_to_date = [
-            ("#data\\.toDate", "css"),
             ("data.toDate", "id"),
+            ("#data\\.toDate", "css"),
             ("//*[@id='data.toDate']", "xpath"),
-            ("input[name='data.toDate']", "css"),
-            ("input[id='data.toDate']", "css")
+            ("data.toDate", "name")
         ]
         
         data_preenchida = False
         for selector, by_type in selectors_to_date:
             try:
-                wait_for_send_keys(driver, selector, data_final, timeout=15, by_type=by_type)
-                print(f"✅ Data final preenchida usando {by_type}: {selector}")
+                wait_for_send_keys_js(driver, selector, data_final, timeout=15, by_type=by_type)
+                print(f"✅ Data final preenchida via JS usando {by_type}: {selector}")
                 data_preenchida = True
                 break
             except Exception as e:
-                print(f"⚠️ Falhou com {by_type} {selector}: {str(e)[:80]}")
-                continue
+                print(f"⚠️ Falhou JS com {by_type} {selector}: {str(e)[:80]}")
+                # Tenta método tradicional como fallback
+                try:
+                    wait_for_send_keys(driver, selector, data_final, timeout=10, by_type=by_type)
+                    print(f"✅ Data final preenchida via método tradicional: {selector}")
+                    data_preenchida = True
+                    break
+                except:
+                    continue
         
         if not data_preenchida:
             raise Exception("Não foi possível preencher campo de data final")
