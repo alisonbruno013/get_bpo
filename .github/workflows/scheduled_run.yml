@@ -3,10 +3,9 @@ name: Execução Agendada BPO
 on:
   schedule:
     # Executa todos os dias às 09:00, 15:00, 18:00 e 00:00 UTC
-    # Ajuste os horários conforme seu fuso horário
     # UTC-3 (Brasil): 09h BR = 12h UTC, 15h BR = 18h UTC, 18h BR = 21h UTC, 00h BR = 03h UTC
-    - cron: '0 12,18,21,3 * * *'  # 09h, 15h, 18h, 00h (horário de Brasília)
-  workflow_dispatch:  # Permite execução manual
+    - cron: '0 12,18,21,3 * * *'
+  workflow_dispatch: # Permite execução manual
 
 jobs:
   run-bpo-script:
@@ -50,16 +49,6 @@ jobs:
       run: |
         # As variáveis de ambiente serão usadas automaticamente pelo script
         echo "Configurações de email configuradas via secrets"
-    
-    - name: Instalar Chrome
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y wget gnupg
-        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
-        # ChromeDriver é gerenciado automaticamente pelo webdriver-manager
     
     - name: Executar script BPO
       run: |
