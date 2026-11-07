@@ -26,9 +26,9 @@ class Config:
     }
     
     # Filtros do DataFrame
-    FILTER_VALUES = ["FMH", "OF", "LMH"]
+    FILTER_VALUES = ["FMH", "LMH"]
     OPERATION_COLUMN_INDEX = 12 # Coluna 13 (índice 12)
-    REGION_FILTER_VALUES = ["SPM", "SPI"]
+    REGION_FILTER_VALUES = ["SPM", "SPC"]
     REGION_COLUMN_INDEX = 8  # Coluna 9 (índice 8)
     
     # Datas
